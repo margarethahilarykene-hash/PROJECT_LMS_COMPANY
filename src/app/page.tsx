@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-10 sm:px-8 lg:px-12">
@@ -51,12 +53,12 @@ export default function Home() {
                   />
                 </div>
 
-                <button
-                  type="button"
-                  className="w-full rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                <Link
+                  href="/dashboard"
+                  className="flex w-full items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                 >
                   Login
-                </button>
+                </Link>
               </form>
 
               <p className="text-center text-sm text-slate-500">
