@@ -93,9 +93,28 @@ export default function CertificatesPage() {
       return;
     }
 
-    // Load bundled html2pdf.js directly from CDN
+    // 1. Muat jsPDF
     await loadScript(
-      'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+      'jspdf-cdn',
+      () => !!(window.jspdf || window.jsPDF)
+    );
+
+    // Daftarkan jsPDF ke window global
+    if (window.jspdf && !window.jsPDF) {
+      window.jsPDF = window.jspdf.jsPDF;
+    }
+
+    // 2. Muat html2canvas-pro (Mendukung format oklch/lab)
+    await loadScript(
+      'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js',
+      'html2canvas-pro-cdn',
+      () => !!(window as any).html2canvas
+    );
+
+    // 3. Muat unbundled html2pdf
+    await loadScript(
+      'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.min.js',
       'html2pdf-cdn',
       () => !!window.html2pdf
     );
@@ -128,6 +147,7 @@ export default function CertificatesPage() {
             scale: 3,
             useCORS: true,
             letterRendering: true,
+            ignoreElements: (el: any) => el.classList?.contains('no-print'),
           },
           jsPDF: {
             unit: 'mm',
