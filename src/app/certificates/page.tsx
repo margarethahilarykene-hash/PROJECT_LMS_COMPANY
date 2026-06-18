@@ -93,28 +93,9 @@ export default function CertificatesPage() {
       return;
     }
 
-    // 1. Muat jsPDF
+    // Load bundled html2pdf.js directly from CDN
     await loadScript(
-      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-      'jspdf-cdn',
-      () => !!(window.jspdf || window.jsPDF)
-    );
-
-    // Setelah jsPDF sukses termuat, daftarkan ke global
-    if (window.jspdf && !window.jsPDF) {
-      window.jsPDF = window.jspdf.jsPDF;
-    }
-
-    // 2. Muat html2canvas-pro (Mendukung oklch/lab)
-    await loadScript(
-      'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js',
-      'html2canvas-pro-cdn',
-      () => !!(window as any).html2canvas
-    );
-
-    // 3. Muat unbundled html2pdf
-    await loadScript(
-      'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
       'html2pdf-cdn',
       () => !!window.html2pdf
     );
@@ -300,7 +281,7 @@ export default function CertificatesPage() {
             {isDownloading ? (
               <>
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Downloading PDF...
+                Sedang Mengunduh...
               </>
             ) : (
               'Download Certificate'
@@ -441,3 +422,5 @@ export default function CertificatesPage() {
     </div>
   );
 }
+
+// Update build production final
