@@ -50,10 +50,10 @@ export default function CertificatePage() {
     setIsDownloading(true);
 
     try {
-      // Simpan status kelulusan kurikulum secara permanen harian
+      // Simpan status kelulusan kurikulum secara permanen
       localStorage.setItem('training_completed', 'true');
 
-      // Memuat library html2pdf dan html2canvas-pro pendukung modern secara dinamis
+      // Memuat library pendukung secara dinamis dari CDN yang kompatibel dengan Vercel & Tailwind modern
       if (!(window as any).html2pdf) {
         const loadScript = (src: string) => {
           return new Promise<void>((resolve, reject) => {
@@ -72,7 +72,7 @@ export default function CertificatePage() {
           (window as any).jsPDF = (window as any).jspdf.jsPDF;
         }
 
-        // Memuat html2canvas-pro versi modern penyelesai crash oklch
+        // Memuat html2canvas-pro versi modern penyelesai crash warna oklch/lab Next.js
         await loadScript('https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js');
 
         // Memuat html2pdf inti
@@ -88,7 +88,6 @@ export default function CertificatePage() {
           scale: 3,
           useCORS: true,
           letterRendering: true,
-          // Menggunakan tipe 'any' untuk menghindari konflik tipe React.JSX.Element pada Next.js compiler
           ignoreElements: (element: any) => element.classList.contains('no-print')
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
