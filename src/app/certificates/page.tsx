@@ -88,7 +88,8 @@ export default function CertificatePage() {
           scale: 3,
           useCORS: true,
           letterRendering: true,
-          ignoreElements: (element: any) => element.classList.contains('no-print')
+          // Menggunakan nama variabel 'el' tipe 'any' untuk menghindari konflik global tipe Element DOM browser
+          ignoreElements: (el: any) => el && el.classList && el.classList.contains('no-print')
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       };
