@@ -1,446 +1,288 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-declare global {
-  interface Window {
-    html2pdf?: any;
-    jspdf?: any;
-    jsPDF?: any;
-  }
-}
-
-export default function CertificatesPage() {
+export default function CertificatePage() {
   const router = useRouter();
-  const [userName, setUserName] = useState('Employee');
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState('Margaretha Hilary Kene');
   const [courseTitle, setCourseTitle] = useState('Generative AI & Tech Productivity');
-  const [isReady, setIsReady] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const certificateRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const initialize = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      const user = data?.user;
+    const fetchSessionAndData = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
+          router.push('/');
+          return;
+        }
 
-      if (error || !user) {
-        router.push('/login');
-        return;
+        const fullName = user.user_metadata?.full_name;
+        if (fullName) {
+          setUserName(fullName);
+        } else if (user.email === 'margarethahilarykene@gmail.com') {
+          setUserName('Margaretha Hilary Kene');
+        } else {
+          const emailPrefix = user.email ? user.email.split('@')[0] : 'Employee';
+          setUserName(emailPrefix);
+        }
+
+        const savedCourseTitle = localStorage.getItem('enrolledCourseTitle');
+        if (savedCourseTitle) {
+          setCourseTitle(savedCourseTitle);
+        }
+      } catch (err) {
+        console.error('Failed to load user credentials:', err);
+      } finally {
+        setLoading(false);
       }
-
-      const fullName = user.user_metadata?.full_name?.toString().trim();
-      const fallbackName =
-        user.email === 'margarethahilarykene@gmail.com'
-          ? 'Margaretha Hilary Kene'
-          : user.email?.split('@')[0] || 'Employee';
-
-      setUserName(fullName || fallbackName);
-
-      if (typeof window !== 'undefined') {
-        const storedTitle = localStorage.getItem('enrolledCourseTitle');
-        setCourseTitle(storedTitle?.trim() || 'Generative AI & Tech Productivity');
-      }
-
-      setIsReady(true);
     };
 
-    initialize();
+    fetchSessionAndData();
   }, [router]);
 
-  const loadScript = (url: string, id: string, checkGlobal: () => boolean): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window === 'undefined') {
-        reject(new Error('Window is not available'));
-        return;
-      }
-
-      if (checkGlobal()) {
-        resolve();
-        return;
-      }
-
-      const existingScript = document.getElementById(id) as HTMLScriptElement;
-      if (existingScript) {
-        if (existingScript.dataset.loaded === 'true') {
-          resolve();
-        } else {
-          existingScript.addEventListener('load', () => resolve());
-          existingScript.addEventListener('error', () => reject(new Error(`Failed to load ${id}`)));
-        }
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = url;
-      script.id = id;
-      script.async = true;
-      script.onload = () => {
-        script.dataset.loaded = 'true';
-        resolve();
-      };
-      script.onerror = () => reject(new Error(`Failed to load ${id}`));
-      document.body.appendChild(script);
-    });
-  };
-
-  const loadHtml2PdfScript = async (): Promise<void> => {
-    if (typeof window === 'undefined') {
-      throw new Error('Window is not available');
-    }
-
-    if (window.html2pdf) {
-      return;
-    }
-
-    // 1. Muat jsPDF
-    await loadScript(
-      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-      'jspdf-cdn',
-      () => !!(window.jspdf || window.jsPDF)
-    );
-
-    // Daftarkan jsPDF ke window global
-    if (window.jspdf && !window.jsPDF) {
-      window.jsPDF = window.jspdf.jsPDF;
-    }
-
-    // 2. Muat html2canvas-pro (Mendukung format oklch/lab)
-    await loadScript(
-      'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js',
-      'html2canvas-pro-cdn',
-      () => !!(window as any).html2canvas
-    );
-
-    // 3. Muat unbundled html2pdf
-    await loadScript(
-      'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.min.js',
-      'html2pdf-cdn',
-      () => !!window.html2pdf
-    );
-  };
-
   const handleDownloadPDF = async () => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    localStorage.setItem('training_completed', 'true');
+    if (!certificateRef.current) return;
     setIsDownloading(true);
 
     try {
-      await loadHtml2PdfScript();
+      // Simpan status kelulusan kurikulum secara permanen harian
+      localStorage.setItem('training_completed', 'true');
 
-      const element = document.getElementById('certificate-card');
-      if (!element || !window.html2pdf) {
-        throw new Error('Certificate element or html2pdf library is not available');
+      // Mengatasi error parsing warna "lab/oklch" pada library Next.js
+      if (!(window as any).html2pdf) {
+        const loadScript = (src: string) => {
+          return new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = (e) => reject(e);
+            document.head.appendChild(script);
+          });
+        };
+
+        // Memuat jsPDF
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        if ((window as any).jspdf && !(window as any).jsPDF) {
+          (window as any).jsPDF = (window as any).jspdf.jsPDF;
+        }
+
+        // Memuat html2canvas-pro versi modern penyelesai crash oklch
+        await loadScript('https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js');
+
+        // Memuat html2pdf inti
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.min.js');
       }
 
-      const fileName = `Sertifikat_${userName.replace(/[^a-zA-Z0-9-_\s]/g, '').replace(/\s+/g, '_')}.pdf`;
+      const html2pdf = (window as any).html2pdf;
+      const opt = {
+        margin: 0,
+        filename: `Sertifikat_${userName.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 3,
+          useCORS: true,
+          letterRendering: true,
+          ignoreElements: (element: Element) => element.classList.contains('no-print')
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
 
-      await window.html2pdf()
-        .set({
-          margin: 0,
-          filename: fileName,
-          image: { type: 'jpeg', quality: 1 },
-          html2canvas: {
-            scale: 3,
-            useCORS: true,
-            letterRendering: true,
-            ignoreElements: (el: any) => el.classList?.contains('no-print'),
-          },
-          jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'landscape',
-          },
-        })
-        .from(element)
-        .save();
-    } catch (error) {
-      console.error('Download PDF failed:', error);
+      await html2pdf().from(certificateRef.current).set(opt).save();
+
+      // Pemuatan ulang keras agar menu-menu dashboard langsung terbuka segar
+      window.location.href = '/dashboard';
+    } catch (err) {
+      console.error('Download PDF error, triggering print fallback:', err);
+      window.print();
+      window.location.href = '/dashboard';
     } finally {
       setIsDownloading(false);
     }
   };
 
-  const handleGoBack = () => {
-    router.push('/dashboard');
-  };
-
-  if (!isReady) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6 py-10 text-slate-100">
-        <div className="rounded-3xl border border-slate-700 bg-slate-900/90 p-8 text-center shadow-2xl shadow-slate-950/40">
-          <p className="text-lg font-medium text-slate-200">Loading certificate details...</p>
+      <div className="min-h-screen bg-[#060913] text-slate-100 flex items-center justify-center font-sans">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#00a3ff] mx-auto mb-4"></div>
+          <p className="text-slate-400 text-sm">Menyiapkan Sertifikat Anda...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1220] px-6 py-10 text-slate-100">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400;1,700&display=swap');
+    <div className="min-h-screen bg-[#060913] text-slate-100 p-4 md:p-8 lg:p-12 font-sans flex flex-col items-center justify-start">
 
-        .certificate-card {
-          background: #ffffff;
-          position: relative;
-        }
-
-        .certificate-card::before {
-          content: '';
-          position: absolute;
-          inset: 16px;
-          border: 1.5px solid #d4af37;
-          border-radius: 4px;
-          pointer-events: none;
-          z-index: 1;
-        }
-
-        .certificate-card::after {
-          content: '';
-          position: absolute;
-          inset: 21px;
-          border: 0.75px solid #d4af37;
-          border-radius: 2px;
-          pointer-events: none;
-          z-index: 1;
-        }
-
-        .watermark {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 0.05;
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .corner-deco {
-          position: absolute;
-          width: 32px;
-          height: 32px;
-          border: 3px solid #102a54;
-          z-index: 2;
-          pointer-events: none;
-        }
-
-        .corner-deco.top-left {
-          top: 16px;
-          left: 16px;
-          border-right: none;
-          border-bottom: none;
-        }
-
-        .corner-deco.top-right {
-          top: 16px;
-          right: 16px;
-          border-left: none;
-          border-bottom: none;
-        }
-
-        .corner-deco.bottom-left {
-          bottom: 16px;
-          left: 16px;
-          border-right: none;
-          border-top: none;
-        }
-
-        .corner-deco.bottom-right {
-          bottom: 16px;
-          right: 16px;
-          border-left: none;
-          border-top: none;
-        }
-
-        .certificate-content {
-          position: relative;
-          z-index: 3;
-        }
-
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
-          .no-print {
-            display: none !important;
-          }
-          body {
-            background: #ffffff !important;
-          }
-          .certificate-card {
-            box-shadow: none !important;
-            border: none !important;
-          }
-          @page {
-            size: A4 landscape;
-            margin: 0;
-          }
+          body { background-color: white !important; }
+          .no-print { display: none !important; }
+          .print-area { border: none !important; box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
         }
-      `}</style>
+      `}} />
 
-      <div className="mx-auto max-w-6xl">
-        {/* Top bar with back navigation and download button */}
-        <div className="mb-6 flex flex-col gap-4 no-print sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 text-sm font-medium text-slate-300">
-            <button onClick={handleGoBack} className="text-slate-100 transition hover:text-white">
-              Dashboard
-            </button>
-            <span className="text-slate-500">&gt;</span>
-            <span>My Certificate</span>
-          </div>
-          <button
-            onClick={handleDownloadPDF}
-            disabled={isDownloading}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0f766e] px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-900/20 transition hover:bg-[#115e56] disabled:cursor-not-allowed disabled:opacity-70 animate-[pulse_3s_infinite]"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M12 3v10m0 0l-3-3m3 3l3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M5 17.5V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {isDownloading ? (
-              <>
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Sedang Mengunduh...
-              </>
-            ) : (
-              'Download Certificate'
-            )}
-          </button>
+      {/* Navigasi Bilah Atas */}
+      <div className="w-full max-w-4xl no-print flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2 text-slate-500 text-xs md:text-sm">
+          <span className="hover:text-[#00a3ff] cursor-pointer transition-colors" onClick={() => { window.location.href = '/dashboard'; }}>Dashboard</span>
+          <span>&rarr;</span>
+          <span className="text-slate-300 font-semibold">E-Certificate</span>
         </div>
 
-        {/* Certificate Outer Container */}
-        <div className="overflow-hidden rounded-2xl p-6 shadow-2xl">
-          <div
-            id="certificate-card"
-            className="relative mx-auto aspect-[1.414/1] max-w-4xl certificate-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
-          >
-            {/* Vertikal merah tebal memotong dinamis */}
-            <div className="absolute left-0 top-0 bottom-0 w-4 bg-[#dc2626] z-10" />
+        <button
+          onClick={handleDownloadPDF}
+          disabled={isDownloading}
+          className="bg-[#00a3ff] hover:bg-[#0092e4] disabled:bg-slate-800 text-white text-xs md:text-sm font-bold px-6 py-3 rounded-xl transition-all shadow-lg shadow-blue-500/10 flex items-center gap-2"
+        >
+          {isDownloading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              Downloading PDF...
+            </>
+          ) : (
+            <>
+              <span>📥</span> Download Certificate
+            </>
+          )}
+        </button>
+      </div>
 
-            {/* Watermark Tengah: Logo perisai/bintang emas transparan */}
-            <div className="watermark">
-              <svg viewBox="0 0 200 200" className="h-[450px] w-[450px] text-[#d4af37]" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M100 20 L160 45 V110 C160 160 100 190 100 190 C100 190 40 160 40 110 V45 Z" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
-                <circle cx="100" cy="105" r="45" stroke="currentColor" strokeWidth="1" opacity="0.2" />
-                <path d="M100 70 L111 92 H135 L116 106 L123 128 L100 115 L77 128 L84 106 L65 92 H89 Z" fill="currentColor" opacity="0.15" />
-                <circle cx="100" cy="105" r="55" stroke="currentColor" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.2" />
-              </svg>
+      {/* */}
+      <div
+        ref={certificateRef}
+        className="print-area bg-white text-[#111827] rounded-2xl shadow-2xl relative overflow-hidden aspect-[1.414/1] w-full max-w-4xl flex flex-col justify-between p-[4%] border border-slate-200 select-none"
+      >
+        <div className="absolute top-0 left-0 w-3 h-full bg-[#dc2626] z-20"></div>
+
+        {/* Ornamen Siku Pojok Geometris (Fortinet & Vibrant Style) */}
+        <div className="absolute top-0 left-3 w-[15%] h-[15%] pointer-events-none z-10">
+          <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
+            <polygon points="0,0 100,0 0,100" fill="#102a54" />
+            <polygon points="0,0 75,0 0,75" fill="#d4af37" />
+          </svg>
+        </div>
+        <div className="absolute top-0 right-0 w-[15%] h-[15%] pointer-events-none z-10">
+          <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
+            <polygon points="100,0 0,0 100,100" fill="#102a54" />
+            <polygon points="100,0 25,0 100,75" fill="#d4af37" />
+          </svg>
+        </div>
+        <div className="absolute bottom-0 left-3 w-[15%] h-[15%] pointer-events-none z-10">
+          <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
+            <polygon points="0,100 100,100 0,0" fill="#102a54" />
+            <polygon points="0,100 75,100 0,25" fill="#d4af37" />
+          </svg>
+        </div>
+        <div className="absolute bottom-0 right-0 w-[15%] h-[15%] pointer-events-none z-10">
+          <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
+            <polygon points="100,100 0,100 100,0" fill="#102a54" />
+            <polygon points="100,100 25,100 100,25" fill="#d4af37" />
+          </svg>
+        </div>
+
+        <div className="absolute inset-[3%] border-2 border-double border-[#d4af37]/30 rounded-lg pointer-events-none z-10"></div>
+
+        {/* Watermark Latar Belakang */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none z-0">
+          <svg className="w-[45%] h-[45%] fill-current text-[#d4af37]" viewBox="0 0 24 24">
+            <path d="M12 2L2 22h20L12 2zm0 3.99L18.53 18H5.47L12 5.99zM12 8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+          </svg>
+        </div>
+
+        {/* */}
+        <div className="relative z-10 flex-grow flex flex-col justify-between py-[2%] px-[5%]">
+          <div className="flex items-start justify-between w-full">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full border-2 border-[#102a54] bg-[#102a54]/5 flex items-center justify-center">
+                <span className="text-xl font-bold text-[#102a54]">LMS</span>
+              </div>
+              <div className="text-left">
+                <h4 className="text-xs font-extrabold tracking-wider text-[#102a54] uppercase">LMS COMPANY</h4>
+                <p className="text-[9px] text-slate-500 font-bold tracking-widest uppercase">TRAINING INSTITUTE</p>
+              </div>
             </div>
 
-            {/* Ornamen Sudut Biru Navy */}
-            <div className="corner-deco top-left" />
-            <div className="corner-deco top-right" />
-            <div className="corner-deco bottom-left" />
-            <div className="corner-deco bottom-right" />
+            <div className="bg-[#0f766e] text-white px-5 py-2.5 rounded-bl-2xl border-l border-b border-emerald-400/30 text-right">
+              <div className="text-[9px] tracking-widest font-extrabold uppercase text-emerald-200">LMS CERTIFIED FUNDAMENTALS</div>
+              <div className="text-xs font-bold mt-0.5 truncate max-w-[180px]" suppressHydrationWarning={true}>{courseTitle}</div>
+            </div>
+          </div>
 
-            {/* Certificate Content */}
-            <div className="certificate-content flex h-full flex-col justify-between px-16 py-14">
+          <div className="space-y-4 my-auto text-center w-full">
+            <div className="space-y-1">
+              <h1 className="text-xl md:text-2xl font-extrabold tracking-[0.25em] text-[#102a54] uppercase font-sans">
+                CERTIFICATE OF APPRECIATION
+              </h1>
+              <p className="text-slate-500 text-[10px] uppercase tracking-widest italic font-bold">
+                THIS CERTIFICATE IS PROUDLY PRESENTED TO
+              </p>
+            </div>
 
-              {/* Header: Seal & Badge */}
-              <div className="flex items-start justify-between w-full">
-                {/* Left: Official Seal */}
-                <div className="flex items-center gap-4">
-                  <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-[#102a54] text-[#d4af37] shadow-md border-2 border-[#d4af37]">
-                    <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full animate-[spin_60s_linear_infinite]" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="50" cy="50" r="45" stroke="#d4af37" strokeWidth="1" strokeDasharray="3 3" />
-                      <circle cx="50" cy="50" r="41" stroke="#d4af37" strokeWidth="0.5" />
-                    </svg>
-                    <svg viewBox="0 0 24 24" className="h-8 w-8 relative z-10" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 7l1.5 3.5h3.5l-2.8 2.2 1.1 3.3-3.3-2.1-3.3 2.1 1.1-3.3-2.8-2.2h3.5L12 7z" />
-                    </svg>
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#102a54]">AUTHORIZED</p>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#d4af37]">TRAINING SEAL</p>
-                    <p className="text-xs font-extrabold text-[#102a54] leading-tight">LMS COMPANY</p>
-                  </div>
-                </div>
+            <div className="py-2 inline-block">
+              <h2
+                suppressHydrationWarning={true}
+                className="text-3xl md:text-4xl font-black text-slate-900 tracking-wide uppercase border-b-2 border-[#d4af37]/60 pb-1 px-8"
+              >
+                {userName}
+              </h2>
+            </div>
 
-                {/* Right: Certified Badge */}
-                <div className="relative w-64 flex-shrink-0 overflow-hidden border border-[#14b8a6]/30 bg-[#0f766e] p-4 text-white shadow-lg rounded-lg">
-                  <div className="absolute inset-1 border border-white/10 pointer-events-none" />
-                  <div className="relative space-y-1 text-center">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#2dd4bf]">
-                      LMS CERTIFIED
-                    </p>
-                    <div className="h-px bg-white/20 my-0.5" />
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/95">
-                      FUNDAMENTALS
-                    </p>
-                    <p
-                      suppressHydrationWarning={true}
-                      className="text-[10px] font-medium text-white/80 whitespace-nowrap overflow-hidden text-ellipsis"
-                    >
-                      {courseTitle}
-                    </p>
-                  </div>
-                </div>
+            <div className="w-full max-w-3xl mx-auto space-y-2">
+              <p className="text-slate-700 text-[11px] md:text-xs leading-relaxed max-w-2xl mx-auto font-medium">
+                for outstanding performance, demonstration of technical proficiency, and successful completion of the specialized curriculum program in
+              </p>
+
+              <h3
+                suppressHydrationWarning={true}
+                className="text-base md:text-xl font-extrabold text-[#102a54] tracking-wide block"
+              >
+                &ldquo;{courseTitle}&rdquo;
+              </h3>
+            </div>
+          </div>
+
+          {/* */}
+          <div className="grid grid-cols-2 gap-12 w-full max-w-3xl mx-auto pt-6 text-center">
+            <div className="flex flex-col items-center justify-end space-y-1.5">
+              <div className="h-10 flex items-center justify-center select-none">
+                <svg className="w-32 h-8 text-slate-900" viewBox="0 0 100 30" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M10,15 Q30,5 50,15 T90,15 M30,10 C40,25 45,5 55,20" strokeLinecap="round" />
+                </svg>
               </div>
-
-              {/* Body Content */}
-              <div className="space-y-4 my-auto">
-                <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-slate-400">
-                  THIS CERTIFICATE IS PROUDLY PRESENTED TO
-                </p>
-                <h1
-                  suppressHydrationWarning={true}
-                  className="text-4xl font-extrabold uppercase tracking-wide text-[#102a54] leading-none py-1"
-                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-                >
-                  {userName}
-                </h1>
-                <p className="w-full max-w-3xl text-xs sm:text-sm leading-relaxed text-slate-600 font-sans">
-                  for outstanding performance, demonstration of technical proficiency, and successful completion of the specialized curriculum program in
-                </p>
-                <p
-                  suppressHydrationWarning={true}
-                  className="w-full text-xl font-extrabold text-[#102a54] tracking-wide whitespace-nowrap overflow-hidden mt-1 italic font-serif"
-                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-                >
-                  &quot;{courseTitle}&quot;
-                </p>
+              <div className="w-[85%] border-t border-slate-300"></div>
+              <div className="text-center">
+                <span className="font-extrabold text-[10px] text-slate-900 block tracking-wide">Irvan Christian</span>
+                <span className="text-slate-500 text-[8px] uppercase tracking-widest block font-bold mt-0.5">Chief Executive Officer, LMS Company</span>
               </div>
+            </div>
 
-              {/* Footer: Symmetrical Signatures */}
-              <div className="grid grid-cols-2 w-full pt-4">
-                {/* CEO Signature */}
-                <div className="space-y-1 text-left">
-                  <div className="h-12 flex items-end">
-                    <svg viewBox="0 0 200 60" className="h-10 w-36 text-slate-800" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M15 35 C35 15, 55 50, 75 25 C85 10, 95 45, 110 30 C125 15, 140 20, 160 25 C175 30, 185 15, 190 20" stroke="#1c1917" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M25 25 C65 10, 105 40, 145 25" stroke="#1c1917" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
-                    </svg>
-                  </div>
-                  <div className="h-px w-44 bg-slate-300 my-1" />
-                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#102a54]">
-                    Irvan Christian
-                  </p>
-                  <p className="text-[9px] text-slate-500 font-medium">Chief Executive Officer, LMS Company</p>
-                </div>
-
-                {/* CTO Signature */}
-                <div className="space-y-1 text-right">
-                  <div className="h-12 flex items-end justify-end">
-                    <svg viewBox="0 0 200 60" className="h-10 w-36 text-slate-800 ml-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M15 25 C45 5, 65 55, 90 30 C110 10, 130 45, 150 20 C170 5, 180 35, 190 15" stroke="#1c1917" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M25 35 C65 15, 105 45, 145 15" stroke="#1c1917" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
-                    </svg>
-                  </div>
-                  <div className="h-px w-44 bg-slate-300 my-1 ml-auto" />
-                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#102a54]">
-                    Sonia Wijaya
-                  </p>
-                  <p className="text-[9px] text-slate-500 font-medium">Chief Technology Officer, LMS Company</p>
-                </div>
+            <div className="flex flex-col items-center justify-end space-y-1.5">
+              <div className="h-10 flex items-center justify-center select-none">
+                <svg className="w-32 h-8 text-slate-900" viewBox="0 0 100 30" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M15,10 Q40,20 60,8 T85,22 M25,20 C35,5 50,25 65,12" strokeLinecap="round" />
+                </svg>
               </div>
-
+              <div className="w-[85%] border-t border-slate-300"></div>
+              <div className="text-center">
+                <span className="font-extrabold text-[10px] text-slate-900 block tracking-wide">Sonia Wijaya</span>
+                <span className="text-slate-500 text-[8px] uppercase tracking-widest block font-bold mt-0.5">Chief Technology Officer, LMS Company</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <footer className="py-6 text-slate-600 text-xs text-center w-full mt-12 border-t border-slate-900 no-print">
+        &copy; 2026 LMS Platform. Managed by Company Administration Team.
+      </footer>
     </div>
   );
 }
-
-// Update build production final
