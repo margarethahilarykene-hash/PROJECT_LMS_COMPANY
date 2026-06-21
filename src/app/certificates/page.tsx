@@ -53,7 +53,7 @@ export default function CertificatePage() {
       // Simpan status kelulusan kurikulum secara permanen harian
       localStorage.setItem('training_completed', 'true');
 
-      // Mengatasi error parsing warna "lab/oklch" pada library Next.js
+      // Memuat library html2pdf dan html2canvas-pro pendukung modern secara dinamis
       if (!(window as any).html2pdf) {
         const loadScript = (src: string) => {
           return new Promise<void>((resolve, reject) => {
@@ -88,7 +88,8 @@ export default function CertificatePage() {
           scale: 3,
           useCORS: true,
           letterRendering: true,
-          ignoreElements: (element: Element) => element.classList.contains('no-print')
+          // Menggunakan tipe 'any' untuk menghindari konflik tipe React.JSX.Element pada Next.js compiler
+          ignoreElements: (element: any) => element.classList.contains('no-print')
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       };
@@ -129,7 +130,7 @@ export default function CertificatePage() {
         }
       `}} />
 
-      {/* Navigasi Bilah Atas */}
+      {/* Breadcrumb & Action Button */}
       <div className="w-full max-w-4xl no-print flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-2 text-slate-500 text-xs md:text-sm">
           <span className="hover:text-[#00a3ff] cursor-pointer transition-colors" onClick={() => { window.location.href = '/dashboard'; }}>Dashboard</span>
@@ -155,7 +156,7 @@ export default function CertificatePage() {
         </button>
       </div>
 
-      {/* */}
+      {/* Main Certificate Sheet */}
       <div
         ref={certificateRef}
         className="print-area bg-white text-[#111827] rounded-2xl shadow-2xl relative overflow-hidden aspect-[1.414/1] w-full max-w-4xl flex flex-col justify-between p-[4%] border border-slate-200 select-none"
@@ -197,7 +198,7 @@ export default function CertificatePage() {
           </svg>
         </div>
 
-        {/* */}
+        {/* Content */}
         <div className="relative z-10 flex-grow flex flex-col justify-between py-[2%] px-[5%]">
           <div className="flex items-start justify-between w-full">
             <div className="flex items-center gap-3">
@@ -249,7 +250,7 @@ export default function CertificatePage() {
             </div>
           </div>
 
-          {/* */}
+          {/* Kolom Tanda Tangan Simetris */}
           <div className="grid grid-cols-2 gap-12 w-full max-w-3xl mx-auto pt-6 text-center">
             <div className="flex flex-col items-center justify-end space-y-1.5">
               <div className="h-10 flex items-center justify-center select-none">
